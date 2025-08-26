@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # Resource Service Database
+  resource-db:
+    image: postgres:16
+    container_name: resource-db
+    environment:
+      POSTGRES_DB: resourcedb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - resource_data:/var/lib/postgresql/data
+
+  # Song Service Database
+  song-db:
+    image: postgres:16
+    container_name: song-db
+    environment:
+      POSTGRES_DB: songdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"  # Different host port
+    volumes:
+      - song_data:/var/lib/postgresql/data
+
+volumes:
+  resource_data:
+  song_data:
