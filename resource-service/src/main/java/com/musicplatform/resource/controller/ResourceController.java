@@ -2,28 +2,42 @@ package com.musicplatform.resource.controller;
 
 import com.musicplatform.resource.dto.ResourceResponseDto;
 import com.musicplatform.resource.dto.DeleteResponseDto;
-import org.springframework.http.MediaType;
+import com.musicplatform.resource.entity.Resource;
+import com.musicplatform.resource.service.ResourceService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/resources")
 public class ResourceController {
 
+    private final ResourceService resourceService;
+
+    @Autowired
+    public ResourceController(ResourceService resourceService) {
+        this.resourceService = resourceService;
+    }
+
     @PostMapping
     public ResponseEntity<ResourceResponseDto> uploadResource(@RequestBody byte[] audioData) {
-        // TODO: Implement actual MP3 upload logic
-        return ResponseEntity.ok(new ResourceResponseDto(1L));
+        Long resourceId = resourceService.uploadResource(audioData);
+        return ResponseEntity.ok(new ResourceResponseDto(resourceId));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<byte[]> getResource(@PathVariable("id") Long id) {
-        // TODO: Implement actual resource retrieval
-        // Return fake MP3 data for now
-        byte[] fakeAudioData = "fake-mp3-content".getBytes();
-        return ResponseEntity.ok()
-                .header("Content-Type", "audio/mpeg")
-                .body(fakeAudioData);
+        Optional<Resource> resource = resourceService.getResourceById(id);
+
+        if (resource.isPresent()) {
+            return ResponseEntity.ok()
+                    .header("Content-Type", "audio/mpeg")
+                    .body(resource.get().getAudioData());
+        } else {
+            throw new IllegalArgumentException("Resource with ID=" + id + " not found");
+        }
     }
 
     @DeleteMapping
@@ -50,8 +64,8 @@ public class ResourceController {
                 }
             }
 
-            // TODO: Implement actual resource deletion
-            return ResponseEntity.ok(new DeleteResponseDto(ids));
+            long[] deletedIds = resourceService.deleteResources(ids);
+            return ResponseEntity.ok(new DeleteResponseDto(deletedIds));
 
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid ID format in CSV string: " + id);
