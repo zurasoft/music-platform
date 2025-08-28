@@ -15,8 +15,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.tika.metadata.HttpHeaders.CONTENT_TYPE;
-
 @Service
 public class MetadataService {
 
@@ -31,7 +29,6 @@ public class MetadataService {
     private static final String YEAR_REGEX = "\\d{4}.*";
     private static final int SECONDS_IN_MINUTE = 60;
     private static final String MP3_MIME_TYPE = "audio/mpeg";
-    private static final String AUDIO_KEYWORD = "audio";
     private static final int MIN_HEADER_LENGTH = 2;
 
     public Map<String, String> extractMetadata(byte[] mp3Data) {
@@ -133,12 +130,12 @@ public class MetadataService {
     }
 
     public boolean isValidMP3(byte[] mp3Data) {
-        logger.info("MP3 validation starting - file size: {} bytes", mp3Data.length);
-
         if (mp3Data == null || mp3Data.length < MIN_HEADER_LENGTH) {
             logger.info("MP3 validation failed: empty or too small input");
             return false;
         }
+
+        logger.info("MP3 validation starting - file size: {} bytes", mp3Data.length);
 
         // Check for ID3 tag first (many MP3s start with ID3 metadata)
         if (mp3Data.length >= 3 && mp3Data[0] == 'I' && mp3Data[1] == 'D' && mp3Data[2] == '3') {
