@@ -1,29 +1,25 @@
 version: '3.8'
 
 services:
-  # Resource Service Database
   resource-db:
-    image: postgres:16
-    container_name: resource-db
+    image: postgres:17-alpine
     environment:
-      POSTGRES_DB: resourcedb
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: resource-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - resource_data:/var/lib/postgresql/data
 
-  # Song Service Database
   song-db:
-    image: postgres:16
-    container_name: song-db
+    image: postgres:17-alpine
     environment:
-      POSTGRES_DB: songdb
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: song-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"  # Different host port
+      - "5433:5432"
     volumes:
       - song_data:/var/lib/postgresql/data
 

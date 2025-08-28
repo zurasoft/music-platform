@@ -34,6 +34,11 @@ public class ResourceService {
     public Long uploadResource(byte[] audioData) {
         logger.info("Starting MP3 upload process, file size: {} bytes", audioData.length);
 
+        // Validate MP3 format
+        if (!metadataService.isValidMP3(audioData)) {
+            throw new IllegalArgumentException("The request body is invalid MP3");
+        }
+
         // Extract metadata using Tika
         Map<String, String> metadata = metadataService.extractMetadata(audioData);
         logger.info("Extracted metadata: {}", metadata);

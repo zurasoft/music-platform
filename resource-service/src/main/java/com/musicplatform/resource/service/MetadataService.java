@@ -15,6 +15,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.apache.tika.metadata.HttpHeaders.CONTENT_TYPE;
+
 @Service
 public class MetadataService {
 
@@ -28,6 +30,9 @@ public class MetadataService {
     private static final int MIN_YEAR_LENGTH = 4;
     private static final String YEAR_REGEX = "\\d{4}.*";
     private static final int SECONDS_IN_MINUTE = 60;
+    private static final String MP3_MIME_TYPE = "audio/mpeg";
+    private static final String AUDIO_KEYWORD = "audio";
+    private static final int MIN_HEADER_LENGTH = 2;
 
     public Map<String, String> extractMetadata(byte[] mp3Data) {
         Map<String, String> metadataMap = new HashMap<>();
@@ -125,5 +130,42 @@ public class MetadataService {
         defaults.put("year", DEFAULT_YEAR);
         defaults.put("duration", DEFAULT_DURATION);
         return defaults;
+    }
+
+    public boolean isValidMP3(byte[] mp3Data) {
+        logger.info("MP3 validation starting - file size: {} bytes", mp3Data.length);
+
+        if (mp3Data == null || mp3Data.length < MIN_HEADER_LENGTH) {
+            logger.info("MP3 validation failed: empty or too small input");
+            return false;
+        }
+
+        // Check for ID3 tag first (many MP3s start with ID3 metadata)
+        if (mp3Data.length >= 3 && mp3Data[0] == 'I' && mp3Data[1] == 'D' && mp3Data[2] == '3') {
+            logger.info("ID3 tag detected - this is likely a valid MP3");
+            // Skip detailed validation for ID3-tagged files, use Tika detection
+        } else {
+            // Check MPEG frame sync for files without ID3 tags
+            if ((mp3Data[0] & 0xFF) != 0xFF || (mp3Data[1] & 0xE0) != 0xE0) {
+                logger.info("MP3 validation failed: no ID3 tag and sync header invalid");
+                return false;
+            }
+        }
+
+        // Tika MIME type detection
+        try (ByteArrayInputStream detectStream = new ByteArrayInputStream(mp3Data)) {
+            String detectedType = new org.apache.tika.Tika().detect(detectStream);
+            logger.info("Tika detected type: {}", detectedType);
+            if (!MP3_MIME_TYPE.equalsIgnoreCase(detectedType)) {
+                logger.info("MP3 validation failed: detected type {}", detectedType);
+                return false;
+            }
+        } catch (IOException e) {
+            logger.warn("MP3 validation error during MIME detection", e);
+            return false;
+        }
+
+        logger.info("MP3 validation passed all checks");
+        return true;
     }
 }

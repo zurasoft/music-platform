@@ -23,10 +23,6 @@ public class ResourceController {
 
     @PostMapping(consumes = "audio/mpeg")
     public ResponseEntity<CreateResourceResponse> uploadResource(@RequestBody byte[] audioData) {
-        if (!isValidMP3(audioData)) {
-            throw new IllegalArgumentException("The request body is invalid MP3");
-        }
-
         Long resourceId = resourceService.uploadResource(audioData);
         return ResponseEntity.ok(new CreateResourceResponse(resourceId));
     }

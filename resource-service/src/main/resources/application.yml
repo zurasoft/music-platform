@@ -6,9 +6,9 @@ spring:
     name: resource-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/resourcedb
-    username: user
-    password: password
+    url: jdbc:postgresql://localhost:5432/resource-db
+    username: postgres
+    password: postgres
     driver-class-name: org.postgresql.Driver
 
   jpa:
