@@ -23,7 +23,7 @@ public class MetadataService {
     private static final String DEFAULT_TITLE = "Unknown Title";
     private static final String DEFAULT_ARTIST = "Unknown Artist";
     private static final String DEFAULT_ALBUM = "Unknown Album";
-    private static final String DEFAULT_YEAR = "1500";
+    private static final String DEFAULT_YEAR = "1900";
     private static final String DEFAULT_DURATION = "00:00";
     private static final int MIN_YEAR_LENGTH = 4;
     private static final String YEAR_REGEX = "\\d{4}.*";

@@ -1,7 +1,7 @@
 package com.musicplatform.resource.controller;
 
-import com.musicplatform.resource.dto.ResourceResponseDto;
-import com.musicplatform.resource.dto.DeleteResponseDto;
+import com.musicplatform.resource.dto.CreateResourceResponse;
+import com.musicplatform.resource.dto.DeleteResourceResponse;
 import com.musicplatform.resource.entity.Resource;
 import com.musicplatform.resource.service.ResourceService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,10 +21,14 @@ public class ResourceController {
         this.resourceService = resourceService;
     }
 
-    @PostMapping
-    public ResponseEntity<ResourceResponseDto> uploadResource(@RequestBody byte[] audioData) {
+    @PostMapping(consumes = "audio/mpeg")
+    public ResponseEntity<CreateResourceResponse> uploadResource(@RequestBody byte[] audioData) {
+        if (!isValidMP3(audioData)) {
+            throw new IllegalArgumentException("The request body is invalid MP3");
+        }
+
         Long resourceId = resourceService.uploadResource(audioData);
-        return ResponseEntity.ok(new ResourceResponseDto(resourceId));
+        return ResponseEntity.ok(new CreateResourceResponse(resourceId));
     }
 
     @GetMapping("/{id}")
@@ -41,7 +45,7 @@ public class ResourceController {
     }
 
     @DeleteMapping
-    public ResponseEntity<DeleteResponseDto> deleteResources(@RequestParam("id") String id) {
+    public ResponseEntity<DeleteResourceResponse> deleteResources(@RequestParam("id") String id) {
         try {
             // Validate CSV length (requirement: < 200 characters)
             if (id.length() >= 200) {
@@ -65,7 +69,7 @@ public class ResourceController {
             }
 
             long[] deletedIds = resourceService.deleteResources(ids);
-            return ResponseEntity.ok(new DeleteResponseDto(deletedIds));
+            return ResponseEntity.ok(new DeleteResourceResponse(deletedIds));
 
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid ID format in CSV string: " + id);
