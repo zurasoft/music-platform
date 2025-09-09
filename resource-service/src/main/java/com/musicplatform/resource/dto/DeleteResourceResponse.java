@@ -1,3 +1,5 @@
 package com.musicplatform.resource.dto;
 
-public record DeleteResourceResponse(long[] ids) {}
+import java.util.List;
+
+public record DeleteResourceResponse(List<Long> ids) {}

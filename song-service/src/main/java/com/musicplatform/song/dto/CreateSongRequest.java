@@ -1,9 +1,16 @@
 package com.musicplatform.song.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public record CreateSongRequest(
-        @NotNull(message = "ID is required")
+
+        @NotNull(message = "ID is required. Uses ID of Resource entity (one-to-one relationship)")
         @Positive(message = "ID must be positive")
         Long id,
 
@@ -29,4 +36,3 @@ public record CreateSongRequest(
         @Max(value = 2099, message = "Year must be between 1900 and 2099")
         String year
 ) { }
-

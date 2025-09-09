@@ -1,103 +1,152 @@
 package com.musicplatform.resource.service;
 
 import com.musicplatform.resource.client.SongServiceClient;
+import com.musicplatform.resource.dto.CreateResourceResponse;
+import com.musicplatform.resource.dto.DeleteResourceResponse;
 import com.musicplatform.resource.entity.Resource;
+import com.musicplatform.resource.exception.MetadataExtractionException;
+import com.musicplatform.resource.exception.ResourceNotFoundException;
 import com.musicplatform.resource.repository.ResourceRepository;
+import org.apache.tika.Tika;
+import org.apache.tika.exception.TikaException;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.mp3.Mp3Parser;
+import org.apache.tika.sax.BodyContentHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.xml.sax.SAXException;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class ResourceService {
 
     private static final Logger logger = LoggerFactory.getLogger(ResourceService.class);
+    private static final String AUDIO_MPEG_MEDIA_TYPE = "audio/mpeg";
+    private static final int SECONDS_PER_MINUTE = 60;
 
     private final ResourceRepository resourceRepository;
-    private final MetadataService metadataService;
     private final SongServiceClient songServiceClient;
 
     @Autowired
     public ResourceService(ResourceRepository resourceRepository,
-                           MetadataService metadataService,
                            SongServiceClient songServiceClient) {
         this.resourceRepository = resourceRepository;
-        this.metadataService = metadataService;
         this.songServiceClient = songServiceClient;
     }
 
-    public Long uploadResource(byte[] audioData) {
-        logger.info("Starting MP3 upload process, file size: {} bytes", audioData.length);
-
-        // Validate MP3 format
-        if (!metadataService.isValidMP3(audioData)) {
-            throw new IllegalArgumentException("The request body is invalid MP3");
+    public CreateResourceResponse create(byte[] audioData) {
+        if (audioData == null
+                || audioData.length == 0
+                || (!isAudioMpegMediaType(audioData))) {
+            throw new IllegalArgumentException("Input MP3 data should be of type audio/mpeg and also not empty");
         }
 
-        // Extract metadata using Tika
-        Map<String, String> metadata = metadataService.extractMetadata(audioData);
-        logger.info("Extracted metadata: {}", metadata);
-
-        // Create resource entity
-        Resource resource = new Resource(
-                generateFilename(metadata),
-                "audio/mpeg",
-                (long) audioData.length,
-                audioData
-        );
-
-        // Save to database
+        Resource resource = new Resource(audioData);
         Resource savedResource = resourceRepository.save(resource);
-        logger.info("Saved resource with ID: {}", savedResource.getId());
+        Long savedResourceId = savedResource.getId();
+        logger.info("Saved resource with ID: {}", savedResourceId);
 
-        // Send metadata to Song Service
-        songServiceClient.createSongMetadata(savedResource.getId(), metadata);
+        Map<String, String> songMetadata = extractSongMetadata(audioData);
+        logger.info("Extracted metadata: {}", songMetadata);
 
-        return savedResource.getId();
+        songServiceClient.saveSongMetadata(savedResourceId, songMetadata);
+
+        return new CreateResourceResponse(savedResourceId);
     }
 
-    public Optional<Resource> getResourceById(Long id) {
-        return resourceRepository.findById(id);
+    public byte[] getById(Long id) {
+        return resourceRepository.findById(id)
+                .map(Resource::getAudioData)
+                .filter(data -> data.length > 0)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Resource with ID=" + id + " not found or has no audio data"));
     }
 
-    public long[] deleteResources(long[] ids) {
+    public DeleteResourceResponse deleteAllByIds(String csvIds) {
+        if (csvIds.length() >= 200) {
+            throw new IllegalArgumentException("CSV string exceeds 200 characters");
+        }
+
+        String[] idStrings = csvIds.split(",");
         List<Long> deletedIds = new ArrayList<>();
+        Long idForDeletion;
 
-        for (long id : ids) {
-            if (resourceRepository.existsById(id)) {
-                resourceRepository.deleteById(id);
-                deletedIds.add(id);
-                logger.info("Deleted resource with ID: {}", id);
+        for (String idString : idStrings) {
+            String idStr = idString.trim();
 
-                // Delete from Song Service (cascade requirement)
-                songServiceClient.deleteSongMetadata(id);
-            } else {
-                logger.warn("Resource with ID {} not found for deletion", id);
+            try {
+                idForDeletion = Long.parseLong(idStr);
+
+                if (resourceRepository.existsById(idForDeletion)) {
+                    resourceRepository.deleteById(idForDeletion);
+                    logger.info("Deleted resource with ID: {}", idForDeletion);
+
+                    deletedIds.add(idForDeletion);
+                } else {
+                    logger.warn("Resource with ID {} not found for deletion", idForDeletion);
+                }
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid ID format in CSV string: " + idStr);
             }
         }
 
-        return deletedIds.stream().mapToLong(Long::longValue).toArray();
+        songServiceClient.deleteAllSongMetadataByIds(csvIds);
+
+        return new DeleteResourceResponse(deletedIds);
     }
 
-    private String generateFilename(Map<String, String> metadata) {
-        String artist = metadata.get("artist");
-        String title = metadata.get("name");
-
-        // Create filename like "Artist - Title.mp3"
-        if (!"Unknown Artist".equals(artist) && !"Unknown Title".equals(title)) {
-            return sanitizeFilename(artist + " - " + title + ".mp3");
+    private boolean isAudioMpegMediaType(byte[] mp3Data) {
+        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(mp3Data)) {
+            String mediaType = new Tika().detect(byteArrayInputStream);
+            return AUDIO_MPEG_MEDIA_TYPE.equalsIgnoreCase(mediaType);
+        } catch (IOException e) {
+            return false;
         }
-
-        return "uploaded-file.mp3";
     }
 
-    private String sanitizeFilename(String filename) {
-        // Remove invalid filename characters
-        return filename.replaceAll("[^a-zA-Z0-9\\.\\-_ ]", "").trim();
+    public Map<String, String> extractSongMetadata(byte[] audioData) {
+        Map<String, String> metadataMap = new HashMap<>();
+
+        try (ByteArrayInputStream inputStream = new ByteArrayInputStream(audioData)) {
+            BodyContentHandler handler = new BodyContentHandler();
+            Metadata metadata = new Metadata();
+            ParseContext parseContext = new ParseContext();
+            Mp3Parser mp3Parser = new Mp3Parser();
+            mp3Parser.parse(inputStream, handler, metadata, parseContext);
+
+            metadataMap.put("name", metadata.get("dc:title"));
+            metadataMap.put("artist", metadata.get("xmpDM:artist"));
+            metadataMap.put("album", metadata.get("xmpDM:album"));
+
+            String durationStr = metadata.get("xmpDM:duration");
+            metadataMap.put("duration", durationStr == null ? null
+                    : formatDurationFromSecondsToMinutesAndSeconds(durationStr));
+
+            metadataMap.put("year", metadata.get("xmpDM:releaseDate"));
+            return metadataMap;
+        } catch (IOException | SAXException | TikaException e) {
+            throw new MetadataExtractionException("Failed to extract MP3 metadata", e);
+        }
+    }
+
+    private String formatDurationFromSecondsToMinutesAndSeconds(String durationStr) {
+        try {
+            double totalSecondsDouble = Double.parseDouble(durationStr);
+            int totalSeconds = (int) totalSecondsDouble;
+            int minutes = totalSeconds / SECONDS_PER_MINUTE;
+            int seconds = totalSeconds % SECONDS_PER_MINUTE;
+            return String.format("%02d:%02d", minutes, seconds);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

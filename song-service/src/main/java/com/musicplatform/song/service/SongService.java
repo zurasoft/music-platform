@@ -1,8 +1,11 @@
 package com.musicplatform.song.service;
 
 import com.musicplatform.song.dto.CreateSongRequest;
+import com.musicplatform.song.dto.CreateSongResponse;
+import com.musicplatform.song.dto.DeleteSongResponse;
 import com.musicplatform.song.dto.SongResponse;
 import com.musicplatform.song.entity.Song;
+import com.musicplatform.song.exception.ResourceNotFoundException;
 import com.musicplatform.song.repository.SongRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class SongService {
@@ -25,48 +27,58 @@ public class SongService {
         this.songRepository = songRepository;
     }
 
-    public Long createSong(CreateSongRequest songRequest) {
-        if (songRepository.existsById(songRequest.id())) {
-            throw new IllegalArgumentException("Metadata for ID=" + songRequest.id() + " already exists");
+    public CreateSongResponse create(CreateSongRequest createSongRequest) {
+        if (songRepository.existsById(createSongRequest.id())) {
+            throw new IllegalArgumentException("Metadata for ID=" + createSongRequest.id() + " already exists");
         }
 
-        Song song = new Song(
-                songRequest.id(),
-                songRequest.name(),
-                songRequest.artist(),
-                songRequest.album(),
-                songRequest.duration(),
-                songRequest.year()
-        );
+        Song song = toEntity(createSongRequest);
 
         Song savedSong = songRepository.save(song);
         logger.info("Created song metadata for ID: {}", savedSong.getId());
 
-        return savedSong.getId();
+        return new CreateSongResponse(savedSong.getId());
     }
 
-    public Optional<SongResponse> getSongById(Long id) {
+    public SongResponse getById(Long id) {
         return songRepository.findById(id)
-                .map(this::convertToResponse);
+                .map(this::toDto)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Song metadata with ID=" + id + " not found"));
     }
 
-    public long[] deleteSongs(long[] ids) {
-        List<Long> deletedIds = new ArrayList<>();
+    public DeleteSongResponse deleteAllByIds(String csvIds) {
+        if (csvIds.length() >= 200) {
+            throw new IllegalArgumentException("CSV string exceeds 200 characters");
+        }
 
-        for (long id : ids) {
-            if (songRepository.existsById(id)) {
-                songRepository.deleteById(id);
-                deletedIds.add(id);
-                logger.info("Deleted song metadata for ID: {}", id);
-            } else {
-                logger.warn("Song metadata with ID {} not found for deletion", id);
+        String[] idStrings = csvIds.split(",");
+        List<Long> deletedIds = new ArrayList<>();
+        Long idForDeletion;
+
+        for (String idString : idStrings) {
+            String idStr = idString.trim();
+
+            try {
+                idForDeletion = Long.parseLong(idStr);
+
+                if (songRepository.existsById(idForDeletion)) {
+                    songRepository.deleteById(idForDeletion);
+                    logger.info("Deleted song metadata with ID: {}", idForDeletion);
+
+                    deletedIds.add(idForDeletion);
+                } else {
+                    logger.warn("Song metadata with ID {} not found for deletion", idForDeletion);
+                }
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Invalid ID format in CSV string: " + idStr);
             }
         }
 
-        return deletedIds.stream().mapToLong(Long::longValue).toArray();
+        return new DeleteSongResponse(deletedIds);
     }
 
-    private SongResponse convertToResponse(Song song) {
+    private SongResponse toDto(Song song) {
         return new SongResponse(
                 song.getId(),
                 song.getName(),
@@ -75,5 +87,15 @@ public class SongService {
                 song.getDuration(),
                 song.getYear()
         );
+    }
+
+    private Song toEntity(CreateSongRequest createSongRequest) {
+        return new Song(
+                createSongRequest.id(),
+                createSongRequest.name(),
+                createSongRequest.artist(),
+                createSongRequest.album(),
+                createSongRequest.duration(),
+                createSongRequest.year());
     }
 }

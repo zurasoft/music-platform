@@ -1,3 +1,5 @@
 package com.musicplatform.song.dto;
 
-public record DeleteSongResponse(long[] ids) {}
+import java.util.List;
+
+public record DeleteSongResponse(List<Long> ids) {}

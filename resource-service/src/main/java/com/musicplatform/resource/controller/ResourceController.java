@@ -2,17 +2,25 @@ package com.musicplatform.resource.controller;
 
 import com.musicplatform.resource.dto.CreateResourceResponse;
 import com.musicplatform.resource.dto.DeleteResourceResponse;
-import com.musicplatform.resource.entity.Resource;
 import com.musicplatform.resource.service.ResourceService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.Optional;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/resources")
 public class ResourceController {
+
+    private static final MediaType AUDIO_MPEG = MediaType.parseMediaType("audio/mpeg");
 
     private final ResourceService resourceService;
 
@@ -21,54 +29,28 @@ public class ResourceController {
         this.resourceService = resourceService;
     }
 
-    @PostMapping(consumes = "audio/mpeg")
-    public ResponseEntity<CreateResourceResponse> uploadResource(@RequestBody byte[] audioData) {
-        Long resourceId = resourceService.uploadResource(audioData);
-        return ResponseEntity.ok(new CreateResourceResponse(resourceId));
+    @PostMapping
+    public ResponseEntity<CreateResourceResponse> create(@RequestBody byte[] audioData) {
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(resourceService.create(audioData));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<byte[]> getResource(@PathVariable("id") Long id) {
-        Optional<Resource> resource = resourceService.getResourceById(id);
+    public ResponseEntity<byte[]> getById(@PathVariable("id") Long id) {
+        byte[] audioData = resourceService.getById(id);
 
-        if (resource.isPresent()) {
-            return ResponseEntity.ok()
-                    .header("Content-Type", "audio/mpeg")
-                    .body(resource.get().getAudioData());
-        } else {
-            throw new IllegalArgumentException("Resource with ID=" + id + " not found");
-        }
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .contentType(AUDIO_MPEG)
+                .contentLength(audioData.length)
+                .body(audioData);
     }
 
     @DeleteMapping
-    public ResponseEntity<DeleteResourceResponse> deleteResources(@RequestParam("id") String id) {
-        try {
-            // Validate CSV length (requirement: < 200 characters)
-            if (id.length() >= 200) {
-                throw new IllegalArgumentException("CSV string exceeds 200 characters");
-            }
-
-            String[] idStrings = id.split(",");
-            long[] ids = new long[idStrings.length];
-
-            for (int i = 0; i < idStrings.length; i++) {
-                String idStr = idStrings[i].trim();
-                if (idStr.isEmpty()) {
-                    throw new IllegalArgumentException("Empty ID in CSV string");
-                }
-                ids[i] = Long.parseLong(idStr);
-
-                // Validate ID is positive
-                if (ids[i] <= 0) {
-                    throw new IllegalArgumentException("ID must be positive: " + ids[i]);
-                }
-            }
-
-            long[] deletedIds = resourceService.deleteResources(ids);
-            return ResponseEntity.ok(new DeleteResourceResponse(deletedIds));
-
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid ID format in CSV string: " + id);
-        }
+    public ResponseEntity<DeleteResourceResponse> deleteAllByIds(@RequestParam("id") String csvIds) {
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(resourceService.deleteAllByIds(csvIds));
     }
 }

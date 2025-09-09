@@ -2,74 +2,68 @@ package com.musicplatform.resource.client;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.util.Map;
+
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 @Service
 public class SongServiceClient {
 
     private static final Logger logger = LoggerFactory.getLogger(SongServiceClient.class);
+    private static final String SONGS_ENDPOINT = "/songs";
+    private static final String ID_QUERY_PARAM = "?id=";
 
-    private final RestTemplate restTemplate;
-    private final String songServiceUrl;
+    private final RestClient restClient;
 
-    public SongServiceClient(RestTemplate restTemplate, @Value("${song-service.url}") String songServiceUrl) {
-        this.restTemplate = restTemplate;
-        this.songServiceUrl = songServiceUrl;
+    @Autowired
+    public SongServiceClient(
+            RestClient.Builder restClientBuilder,
+            @Value("${song-service.url}") String songServiceBaseUrl) {
+        this.restClient = restClientBuilder
+                .baseUrl(songServiceBaseUrl)
+                .build();
     }
 
-    public void createSongMetadata(Long resourceId, Map<String, String> metadata) {
-        try {
-            String url = songServiceUrl + "/songs";
-            logger.info("Attempting to call Song Service at: {}", url);
+    public void saveSongMetadata(Long resourceId, Map<String, String> metadata) {
+        Map<String, Object> requestBody = Map.of(
+                "id", resourceId,
+                "name", metadata.get("name"),
+                "artist", metadata.get("artist"),
+                "album", metadata.get("album"),
+                "duration", metadata.get("duration"),
+                "year", metadata.get("year"));
 
-            // Create request body matching Song Service API
-            Map<String, Object> requestBody = Map.of(
-                    "id", resourceId,
-                    "name", metadata.get("name"),
-                    "artist", metadata.get("artist"),
-                    "album", metadata.get("album"),
-                    "duration", metadata.get("duration"),
-                    "year", metadata.get("year")
-            );
+        restClient.post()
+                .uri(SONGS_ENDPOINT)
+                .contentType(APPLICATION_JSON)
+                .body(requestBody)
+                .retrieve()
+                .toBodilessEntity();
 
-            logger.info("Request body: {}", requestBody);
+//                .exchange();
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+//        String result = restClient.get()
+//                .uri("https://example.com/this-url-does-not-exist")
+//                .retrieve()
+//                .onStatus(HttpStatusCode::is4xxClientError, (request, response) -> {
+//                    throw new MyCustomRuntimeException(response.getStatusCode(), response.getHeaders());
+//                })
+//                .body(String.class);
 
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
 
-            if (response.getStatusCode().is2xxSuccessful()) {
-                logger.info("Successfully created song metadata for resource ID: {}", resourceId);
-            } else {
-                logger.warn("Failed to create song metadata. Status: {}", response.getStatusCode());
-            }
-
-        } catch (Exception e) {
-            logger.error("Error communicating with Song Service for resource ID {}: {}", resourceId, e.getMessage(), e);
-            // Don't throw exception - Resource Service should continue even if Song Service fails
-        }
+//        logger.info("Successfully created song metadata for resource ID: {}", resourceId);
+//        logger.warn("Failed to create song metadata. Status: {}", response.getStatusCode());
     }
 
-    public void deleteSongMetadata(Long resourceId) {
-        try {
-            String url = songServiceUrl + "/songs?id=" + resourceId;
-
-            restTemplate.delete(url);
-            logger.info("Successfully deleted song metadata for resource ID: {}", resourceId);
-
-        } catch (Exception e) {
-            logger.error("Error deleting song metadata for resource ID {}: {}", resourceId, e.getMessage());
-            // Don't throw exception - allow resource deletion to continue
-        }
+    public void deleteAllSongMetadataByIds(String csvIds) {
+        restClient.delete()
+                .uri(SONGS_ENDPOINT + ID_QUERY_PARAM + csvIds)
+                .retrieve()
+                .toBodilessEntity();
     }
 }
