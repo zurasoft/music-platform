@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/resources")
 public class ResourceController {
 
-    private static final MediaType AUDIO_MPEG = MediaType.parseMediaType("audio/mpeg");
+    private static final String AUDIO_MPEG_MEDIA_TYPE = "audio/mpeg";
 
     private final ResourceService resourceService;
 
@@ -29,7 +29,7 @@ public class ResourceController {
         this.resourceService = resourceService;
     }
 
-    @PostMapping
+    @PostMapping(consumes = AUDIO_MPEG_MEDIA_TYPE)
     public ResponseEntity<CreateResourceResponse> create(@RequestBody byte[] audioData) {
         return ResponseEntity
                 .status(HttpStatus.OK)
@@ -42,7 +42,7 @@ public class ResourceController {
 
         return ResponseEntity
                 .status(HttpStatus.OK)
-                .contentType(AUDIO_MPEG)
+                .contentType(MediaType.parseMediaType(AUDIO_MPEG_MEDIA_TYPE))
                 .contentLength(audioData.length)
                 .body(audioData);
     }
@@ -51,6 +51,7 @@ public class ResourceController {
     public ResponseEntity<DeleteResourceResponse> deleteAllByIds(@RequestParam("id") String csvIds) {
         return ResponseEntity
                 .status(HttpStatus.OK)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(resourceService.deleteAllByIds(csvIds));
     }
 }

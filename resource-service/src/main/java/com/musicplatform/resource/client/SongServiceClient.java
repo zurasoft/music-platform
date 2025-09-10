@@ -1,15 +1,18 @@
 package com.musicplatform.resource.client;
 
+import com.musicplatform.resource.exception.DataProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.http.ResponseEntity.status;
 
 @Service
 public class SongServiceClient {
@@ -43,21 +46,12 @@ public class SongServiceClient {
                 .contentType(APPLICATION_JSON)
                 .body(requestBody)
                 .retrieve()
+                .onStatus(this::isFailedResponse, (request, response) -> {
+                    throw new DataProcessingException("Failed to save appropriate metadata for resource with ID: " + resourceId);
+                })
                 .toBodilessEntity();
 
-//                .exchange();
-
-//        String result = restClient.get()
-//                .uri("https://example.com/this-url-does-not-exist")
-//                .retrieve()
-//                .onStatus(HttpStatusCode::is4xxClientError, (request, response) -> {
-//                    throw new MyCustomRuntimeException(response.getStatusCode(), response.getHeaders());
-//                })
-//                .body(String.class);
-
-
-//        logger.info("Successfully created song metadata for resource ID: {}", resourceId);
-//        logger.warn("Failed to create song metadata. Status: {}", response.getStatusCode());
+        logger.info("Successfully saved metadata for resource ID: {}", resourceId);
     }
 
     public void deleteAllSongMetadataByIds(String csvIds) {
@@ -65,5 +59,9 @@ public class SongServiceClient {
                 .uri(SONGS_ENDPOINT + ID_QUERY_PARAM + csvIds)
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    private boolean isFailedResponse(HttpStatusCode status) {
+        return !status.is2xxSuccessful();
     }
 }

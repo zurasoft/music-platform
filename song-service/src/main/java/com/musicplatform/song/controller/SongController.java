@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/songs")
 public class SongController {
 
-    private static final MediaType APPLICATION_JSON = MediaType.APPLICATION_JSON;
+    private static final MediaType APPLICATION_JSON_MEDIA_TYPE = MediaType.APPLICATION_JSON;
 
     private final SongService songService;
 
@@ -43,7 +43,7 @@ public class SongController {
     public ResponseEntity<SongResponse> getById(@PathVariable("id") Long id) {
         return ResponseEntity
                 .status(HttpStatus.OK)
-                .contentType(APPLICATION_JSON)
+                .contentType(APPLICATION_JSON_MEDIA_TYPE)
                 .body(songService.getById(id));
     }
 

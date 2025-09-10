@@ -10,8 +10,8 @@ import jakarta.validation.constraints.Size;
 
 public record CreateSongRequest(
 
-        @NotNull(message = "ID is required. Uses ID of Resource entity (one-to-one relationship)")
-        @Positive(message = "ID must be positive")
+        @NotNull(message = "ID is required. It must match the appropriate Resource ID")
+        @Positive
         Long id,
 
         @NotBlank(message = "Name is required")
@@ -27,7 +27,7 @@ public record CreateSongRequest(
         String album,
 
         @NotBlank(message = "Duration is required")
-        @Pattern(regexp = "\\d{2}:\\d{2}", message = "Duration must be in mm:ss format with leading zeros")
+        @Pattern(regexp = "^([0-5]\\d):([0-5]\\d)$", message = "Duration must be in mm:ss format with leading zeros")
         String duration,
 
         @NotBlank(message = "Year is required")

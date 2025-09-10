@@ -3,7 +3,9 @@ package com.musicplatform.song.exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -23,10 +25,11 @@ public class GlobalExceptionHandler {
                 .getFieldErrors()
                 .stream()
                 .filter(f -> f.getDefaultMessage() != null)
-                .collect(Collectors.toMap(FieldError::getField, FieldError::getDefaultMessage));
+                .collect(Collectors.toMap(
+                        FieldError::getField,
+                        FieldError::getDefaultMessage));
 
-        logger.info("Validation failed ({} {}): {}", HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.name(), details);
+        logger.warn("Validation failed: {}", ex.getMessage());
 
         ErrorResponse response = new ErrorResponse(
                 "Validation error",
@@ -34,23 +37,25 @@ public class GlobalExceptionHandler {
                 details);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(response);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException ex) {
-        logger.warn("Bad request ({} {}): {}", HttpStatus.BAD_REQUEST.value(), HttpStatus.BAD_REQUEST.name(), ex.getMessage());
+        logger.warn("Bad request: {}", ex.getMessage());
         ErrorResponse response = new ErrorResponse(
                 ex.getMessage(),
                 String.valueOf(HttpStatus.BAD_REQUEST.value()));
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(response);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
-        logger.warn("Not found ({} {}): {}", HttpStatus.NOT_FOUND.value(), HttpStatus.NOT_FOUND.name(), ex.getMessage());
+        logger.warn("Not found: {}", ex.getMessage());
         ErrorResponse response = new ErrorResponse(
                 ex.getMessage(),
                 String.valueOf(HttpStatus.NOT_FOUND.value()));
@@ -59,9 +64,32 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(HttpMessageNotReadableException httpMessageNotReadableException) {
+        logger.warn("Not readable: {}", httpMessageNotReadableException.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                "Malformed JSON request",
+                String.valueOf(HttpStatus.BAD_REQUEST.value()));
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response);
+    }
+
+    @ExceptionHandler(DuplicateMetadataException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(DuplicateMetadataException duplicateMetadataException) {
+        logger.warn("Conflict: {}", duplicateMetadataException.getMessage());
+        ErrorResponse response = new ErrorResponse(
+                duplicateMetadataException.getMessage(),
+                String.valueOf(HttpStatus.CONFLICT.value()));
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
-        logger.error(ex.getMessage(), ex);
+        logger.warn(ex.getMessage(), ex);
         ErrorResponse response = new ErrorResponse(
                 "An error occurred on the server.",
                 String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()));

@@ -5,6 +5,7 @@ import com.musicplatform.song.dto.CreateSongResponse;
 import com.musicplatform.song.dto.DeleteSongResponse;
 import com.musicplatform.song.dto.SongResponse;
 import com.musicplatform.song.entity.Song;
+import com.musicplatform.song.exception.DuplicateMetadataException;
 import com.musicplatform.song.exception.ResourceNotFoundException;
 import com.musicplatform.song.repository.SongRepository;
 import org.slf4j.Logger;
@@ -29,13 +30,13 @@ public class SongService {
 
     public CreateSongResponse create(CreateSongRequest createSongRequest) {
         if (songRepository.existsById(createSongRequest.id())) {
-            throw new IllegalArgumentException("Metadata for ID=" + createSongRequest.id() + " already exists");
+            throw new DuplicateMetadataException("Metadata for ID=" + createSongRequest.id() + " already exists");
         }
 
         Song song = toEntity(createSongRequest);
 
         Song savedSong = songRepository.save(song);
-        logger.info("Created song metadata for ID: {}", savedSong.getId());
+        logger.info("Created song metadata. ID: {}", savedSong.getId());
 
         return new CreateSongResponse(savedSong.getId());
     }
@@ -49,7 +50,7 @@ public class SongService {
 
     public DeleteSongResponse deleteAllByIds(String csvIds) {
         if (csvIds.length() >= 200) {
-            throw new IllegalArgumentException("CSV string exceeds 200 characters");
+            throw new IllegalArgumentException(String.format("CSV string is too long: received %s characters, maximum allowed is 200", csvIds.length()));
         }
 
         String[] idStrings = csvIds.split(",");

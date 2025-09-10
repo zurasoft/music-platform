@@ -4,7 +4,8 @@ import com.musicplatform.resource.client.SongServiceClient;
 import com.musicplatform.resource.dto.CreateResourceResponse;
 import com.musicplatform.resource.dto.DeleteResourceResponse;
 import com.musicplatform.resource.entity.Resource;
-import com.musicplatform.resource.exception.MetadataExtractionException;
+import com.musicplatform.resource.exception.InvalidResourceException;
+import com.musicplatform.resource.exception.DataProcessingException;
 import com.musicplatform.resource.exception.ResourceNotFoundException;
 import com.musicplatform.resource.repository.ResourceRepository;
 import org.apache.tika.Tika;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 @Service
 public class ResourceService {
@@ -44,36 +46,39 @@ public class ResourceService {
     }
 
     public CreateResourceResponse create(byte[] audioData) {
-        if (audioData == null
-                || audioData.length == 0
-                || (!isAudioMpegMediaType(audioData))) {
-            throw new IllegalArgumentException("Input MP3 data should be of type audio/mpeg and also not empty");
-        }
+        validateAudio(audioData);
 
-        Resource resource = new Resource(audioData);
-        Resource savedResource = resourceRepository.save(resource);
-        Long savedResourceId = savedResource.getId();
-        logger.info("Saved resource with ID: {}", savedResourceId);
-
+        Long savedResourceId = resourceRepository.save(new Resource(audioData)).getId();
+        logger.info("Created resource with ID: {}", savedResourceId);
         Map<String, String> songMetadata = extractSongMetadata(audioData);
-        logger.info("Extracted metadata: {}", songMetadata);
 
-        songServiceClient.saveSongMetadata(savedResourceId, songMetadata);
+        try {
+            songServiceClient.saveSongMetadata(savedResourceId, songMetadata);
+            return new CreateResourceResponse(savedResourceId);
+        } catch (DataProcessingException dataProcessingException) {
+            resourceRepository.deleteById(savedResourceId);
+            logger.info("Deleted recently created resource with id: {}", savedResourceId);
 
-        return new CreateResourceResponse(savedResourceId);
+            throw new DataProcessingException(
+                    "Failed to save resource for the following reason: " + dataProcessingException.getMessage());
+        }
     }
 
     public byte[] getById(Long id) {
+        if (id <= 0) {
+            throw new IllegalArgumentException(String.format("Invalid value '%s' for ID. Must be a positive integer", id));
+        }
+
         return resourceRepository.findById(id)
                 .map(Resource::getAudioData)
                 .filter(data -> data.length > 0)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Resource with ID=" + id + " not found or has no audio data"));
+                        "Resource with ID=" + id + " not found"));
     }
 
     public DeleteResourceResponse deleteAllByIds(String csvIds) {
         if (csvIds.length() >= 200) {
-            throw new IllegalArgumentException("CSV string exceeds 200 characters");
+            throw new IllegalArgumentException(String.format("CSV string is too long: received %s characters, maximum allowed is 200", csvIds.length()));
         }
 
         String[] idStrings = csvIds.split(",");
@@ -95,7 +100,7 @@ public class ResourceService {
                     logger.warn("Resource with ID {} not found for deletion", idForDeletion);
                 }
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Invalid ID format in CSV string: " + idStr);
+                throw new IllegalArgumentException(String.format("Invalid ID format: '%s'. Only positive integers are allowed", idStr));
             }
         }
 
@@ -109,6 +114,7 @@ public class ResourceService {
             String mediaType = new Tika().detect(byteArrayInputStream);
             return AUDIO_MPEG_MEDIA_TYPE.equalsIgnoreCase(mediaType);
         } catch (IOException e) {
+            logger.error("Error while detecting MP3 data", e);
             return false;
         }
     }
@@ -132,9 +138,11 @@ public class ResourceService {
                     : formatDurationFromSecondsToMinutesAndSeconds(durationStr));
 
             metadataMap.put("year", metadata.get("xmpDM:releaseDate"));
+            logger.info("Successfully extracted MP3 metadata: {}", metadataMap);
+
             return metadataMap;
         } catch (IOException | SAXException | TikaException e) {
-            throw new MetadataExtractionException("Failed to extract MP3 metadata", e);
+            throw new DataProcessingException("Failed to extract MP3 metadata", e);
         }
     }
 
@@ -148,5 +156,18 @@ public class ResourceService {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private void validateAudio(byte[] audioData) {
+        Map<Supplier<Boolean>, String> checks = Map.of(
+                () -> audioData == null || audioData.length == 0, "MP3 data is empty",
+                () -> !isAudioMpegMediaType(audioData), "Invalid MP3 data. Expected audio/mpeg media type");
+
+        checks.forEach((condition, message) -> {
+            if (Boolean.TRUE.equals(condition.get())) {
+                logger.warn("Validation failed: {}", message);
+                throw new InvalidResourceException(message);
+            }
+        });
     }
 }
