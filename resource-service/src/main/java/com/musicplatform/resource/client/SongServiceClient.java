@@ -12,7 +12,6 @@ import org.springframework.web.client.RestClient;
 import java.util.Map;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.http.ResponseEntity.status;
 
 @Service
 public class SongServiceClient {
