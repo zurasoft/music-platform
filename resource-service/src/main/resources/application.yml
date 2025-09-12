@@ -6,7 +6,7 @@ spring:
     name: resource-service
 
   datasource:
-    url: jdbc:postgresql://172.31.33.20:5432/resource-db
+    url: jdbc:postgresql://${WSL_DB_HOST:localhost}:5432/resource-db
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver

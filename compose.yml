@@ -9,8 +9,6 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
-    volumes:
-      - resource_data:/var/lib/postgresql/data
 
   song-db:
     image: postgres:17-alpine
@@ -20,9 +18,3 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5433:5432"
-    volumes:
-      - song_data:/var/lib/postgresql/data
-
-volumes:
-  resource_data:
-  song_data:
