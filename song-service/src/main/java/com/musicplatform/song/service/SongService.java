@@ -72,7 +72,7 @@ public class SongService {
                     logger.warn("Song metadata with ID {} not found for deletion", idForDeletion);
                 }
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Invalid ID format in CSV string: " + idStr);
+                throw new IllegalArgumentException(String.format("Invalid ID format: '%s'. Only positive integers are allowed", idStr));
             }
         }
 
