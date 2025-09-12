@@ -1,7 +1,5 @@
 package com.musicplatform.song.dto;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -27,12 +25,12 @@ public record CreateSongRequest(
         String album,
 
         @NotBlank(message = "Duration is required")
-        @Pattern(regexp = "^([0-5]\\d):([0-5]\\d)$", message = "Duration must be in mm:ss format with leading zeros")
+        @Pattern(regexp = "^\\d{2,}:[0-5]\\d$", message = "Duration must be in mm:ss format with leading zeros")
         String duration,
 
         @NotBlank(message = "Year is required")
-        @Pattern(regexp = "\\d{4}", message = "Year must be in YYYY format")
-        @Min(value = 1900, message = "Year must be between 1900 and 2099")
-        @Max(value = 2099, message = "Year must be between 1900 and 2099")
+        @Pattern(regexp = "\\b(19\\d{2}|20\\d{2})\\b",
+                message = "Year must be in YYYY format and between the range 1900-2099 (both edge-years are inclusive)")
         String year
-) { }
+) {
+}

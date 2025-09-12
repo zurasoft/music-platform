@@ -27,6 +27,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class ResourceService {
@@ -132,12 +134,9 @@ public class ResourceService {
             metadataMap.put("name", metadata.get("dc:title"));
             metadataMap.put("artist", metadata.get("xmpDM:artist"));
             metadataMap.put("album", metadata.get("xmpDM:album"));
+            metadataMap.put("duration", formatAsMinutesAndSeconds(metadata.get("xmpDM:duration")));
+            metadataMap.put("year", extractYear(metadata.get("xmpDM:releaseDate")));
 
-            String durationStr = metadata.get("xmpDM:duration");
-            metadataMap.put("duration", durationStr == null ? null
-                    : formatDurationFromSecondsToMinutesAndSeconds(durationStr));
-
-            metadataMap.put("year", metadata.get("xmpDM:releaseDate"));
             logger.info("Successfully extracted MP3 metadata: {}", metadataMap);
 
             return metadataMap;
@@ -146,7 +145,11 @@ public class ResourceService {
         }
     }
 
-    private String formatDurationFromSecondsToMinutesAndSeconds(String durationStr) {
+    private String formatAsMinutesAndSeconds(String durationStr) {
+        if (durationStr == null) {
+            return null;
+        }
+
         try {
             double totalSecondsDouble = Double.parseDouble(durationStr);
             int totalSeconds = (int) totalSecondsDouble;
@@ -169,5 +172,14 @@ public class ResourceService {
                 throw new InvalidResourceException(message);
             }
         });
+    }
+
+    private String extractYear(String releaseDate) {
+        if (releaseDate == null) {
+            return null;
+        }
+        Pattern yearPattern = Pattern.compile("\\b(19\\d{2}|20\\d{2})\\b");
+        Matcher matcher = yearPattern.matcher(releaseDate);
+        return matcher.find() ? matcher.group(1) : null;
     }
 }
