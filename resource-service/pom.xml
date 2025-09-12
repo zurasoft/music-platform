@@ -5,14 +5,40 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>com.musicplatform</groupId>
-        <artifactId>music-platform</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
-    </parent>
-
+    <groupId>com.musicplatform</groupId>
     <artifactId>resource-service</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
+
+    <name>Resource Service</name>
+    <description>Resource management service of 'Music Platform'</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-boot.version>3.5.5</spring-boot.version>
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+        <tika.version>3.2.2</tika.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Fix for CVE-2025-48924 - Override commons-lang3 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.18.0</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Spring Boot Starters -->
@@ -36,12 +62,12 @@
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>3.2.2</version>
+            <version>${tika.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-parsers-standard-package</artifactId>
-            <version>3.2.2</version>
+            <version>${tika.version}</version>
         </dependency>
 
         <!-- HTTP Client for Song Service communication -->
@@ -56,6 +82,16 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven.compiler.plugin.version}</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                </configuration>
             </plugin>
         </plugins>
     </build>
