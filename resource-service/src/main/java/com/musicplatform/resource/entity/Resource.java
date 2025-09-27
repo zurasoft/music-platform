@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
 
 @Entity
 @Table(name = "resources")
@@ -17,7 +18,8 @@ public class Resource {
     private Long id;
 
     @Lob
-    @Column(name = "audio_data", nullable = false)
+    @JdbcTypeCode(java.sql.Types.BINARY)
+    @Column(name = "audio_data", nullable = false, columnDefinition = "BYTEA")
     private byte[] audioData;
 
     public Resource() {
