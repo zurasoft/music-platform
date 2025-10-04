@@ -4,7 +4,8 @@ import com.musicplatform.resource.exception.DataProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -19,16 +20,18 @@ public class SongServiceClient {
     private static final Logger logger = LoggerFactory.getLogger(SongServiceClient.class);
     private static final String SONGS_ENDPOINT = "/songs";
     private static final String ID_QUERY_PARAM = "?id=";
+    private static final String SONG_SERVICE_NAME = "song-service";
 
+    private final DiscoveryClient discoveryClient;
     private final RestClient restClient;
 
     @Autowired
     public SongServiceClient(
-            RestClient.Builder restClientBuilder,
-            @Value("${song-service.url}") String songServiceBaseUrl) {
-        this.restClient = restClientBuilder
-                .baseUrl(songServiceBaseUrl)
-                .build();
+            DiscoveryClient discoveryClient,
+            RestClient.Builder restClientBuilder) {
+
+        this.discoveryClient = discoveryClient;
+        this.restClient = restClientBuilder.build();
     }
 
     public void saveSongMetadata(Long resourceId, Map<String, String> metadata) {
@@ -41,7 +44,7 @@ public class SongServiceClient {
                 "year", metadata.get("year"));
 
         restClient.post()
-                .uri(SONGS_ENDPOINT)
+                .uri(getServiceUrl() + SONGS_ENDPOINT)
                 .contentType(APPLICATION_JSON)
                 .body(requestBody)
                 .retrieve()
@@ -55,9 +58,18 @@ public class SongServiceClient {
 
     public void deleteAllSongMetadataByIds(String csvIds) {
         restClient.delete()
-                .uri(SONGS_ENDPOINT + ID_QUERY_PARAM + csvIds)
+                .uri(getServiceUrl() + SONGS_ENDPOINT + ID_QUERY_PARAM + csvIds)
                 .retrieve()
                 .toBodilessEntity();
+    }
+
+    private String getServiceUrl() {
+        ServiceInstance instance = discoveryClient.getInstances(SONG_SERVICE_NAME)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new DataProcessingException("No instances of '" + SONG_SERVICE_NAME + "' available"));
+
+        return instance.getUri().toString();
     }
 
     private boolean isFailedResponse(HttpStatusCode status) {
